@@ -22,6 +22,15 @@
 
 ### 1. 建 Pages 项目
 
+**必须建 Pages 项目**（Workers & Pages → Create → 切到 **Pages** 标签 → Connect to Git），
+不要建 Worker 项目：
+
+- `functions/` 目录只在 Pages 里生效。Worker 不认这个结构 —— 官方迁移指南要求先把
+  `functions/` 编译成单个 Worker 脚本、再把 `main` 指过去；照 Worker 的方式建，
+  `/api/records` 会匹配不到资源、落到 SPA fallback 上返回 HTML，前端报 502。
+- Worker 的静态资源目录只能由 wrangler 配置里的 `assets.directory` 指定，dashboard 里
+  没有对应字段 —— 会逼你把部署配置放回仓库。
+
 按 `DEPLOY.md` 建，构建配置不变：
 
 | 设置 | 值 |
