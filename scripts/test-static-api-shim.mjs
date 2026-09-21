@@ -111,7 +111,9 @@ console.log(`样本 id: ${A}, ${B}（共 ${TOTAL} 条）\n`)
   await put(phone, { ...allUnread, [B]: '已读' }) // 手机（快照已过期）标记 B
 
   check('两端各自的标记都保住了', server.records, { [A]: '已读', [B]: '已读' })
-  check('电脑刷新后看到手机标的章节', (await (await get(pc)).json())[B], '已读')
+  // 刷新页面 = 新开一个窗口，内存状态全丢，只剩服务端这一个来源
+  const { win: pcAfterReload } = makeWindow(server)
+  check('电脑刷新页面后看到手机标的章节', (await (await get(pcAfterReload)).json())[B], '已读')
 }
 
 // ---- 场景 4：断网时标记不丢，恢复后自动补传 -------------------------------
@@ -168,6 +170,27 @@ console.log(`样本 id: ${A}, ${B}（共 ${TOTAL} 条）\n`)
     JSON.parse(storage.dump()['arkplots.records.pending']),
     { [A]: '已读' }
   )
+}
+
+// ---- 场景 9：离线标记在恢复联网后以本地为准（同一章节的较新改动会被它覆盖）----
+// 这是「不丢用户操作」的代价，只影响同一章节；不同章节互不影响（见场景 3）。
+{
+  const server = { records: {} }
+  const { win: phone } = makeWindow(server)
+  const allUnread = Object.fromEntries(ids.map((id) => [id, '未读']))
+
+  server.offline = true
+  await put(phone, { ...allUnread, [A]: '已读' }) // 手机离线标记 A
+
+  server.offline = false
+  const { win: pc } = makeWindow(server)
+  await get(pc)
+  await put(pc, { ...allUnread, [A]: '计划读' }) // 电脑把同一章改成「计划读」
+  check('电脑的较新改动已落库', server.records[A], '计划读')
+
+  await get(phone) // 手机恢复联网后首次加载
+  await new Promise((r) => setTimeout(r, 20))
+  check('手机未提交的离线标记优先，并已补传', server.records[A], '已读')
 }
 
 console.log(failures === 0 ? '\n全部通过' : `\n${failures} 项失败`)
